@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cat templates/cps.header.scm 
+scala -cp . CPSConverter $1
+cat templates/cps.footer.scm 
+

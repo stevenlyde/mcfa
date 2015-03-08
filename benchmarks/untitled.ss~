@@ -1,0 +1,7 @@
+(define (do-something)
+  10)
+
+(define (app f x)
+  (do-something)
+  (f x))
+  
