@@ -197,7 +197,7 @@ case class SKeyword(val string : String) extends SExp with Ordered[SKeyword] {
 }
 
 
-abstract case class SSymbol (val string : String) extends SExp {
+abstract class SSymbol (val string : String) extends SExp {
 }
 
 
@@ -794,13 +794,17 @@ abstract case class Lit(val sexp : SExp) extends Exp {
   lazy val free : ImmSet[SName] = ImmSet()
 }
 
-case class SelfLit(val value : SExp) extends Lit(value) {
+class SelfLit(val value : SExp) extends Lit(value) {
   override def toString = sexp.toString
 
   def isDuplicable = true 
 }
 
-case class QuoteLit(val value : SExp) extends Lit(value) {
+object SelfLit {
+  def apply(value : SExp) = new SelfLit(value)
+}
+
+class QuoteLit(val value : SExp) extends Lit(value) {
   override def toString = "(quote " +value.toString+ ")"
   
   def isDuplicable = value match {
@@ -816,6 +820,10 @@ case class QuoteLit(val value : SExp) extends Lit(value) {
       case _ => this
     }
   }
+}
+
+object QuoteLit {
+  def apply(value : SExp) = new QuoteLit(value)
 }
 
 case class App(val fun : Exp, val args : Arguments) extends Exp {
@@ -843,9 +851,17 @@ case class Lambda(val formals : Formals, val body : Body) extends Exp {
   lazy val free = body.free -- formals.bound
 }
 
-case class ULambda(fs : Formals, b : Body) extends Lambda(fs,b)
+class ULambda(fs : Formals, b : Body) extends Lambda(fs,b)
 
-case class KLambda(fs : Formals, b : Body) extends Lambda(fs,b)
+object ULambda {
+  def apply(fs : Formals, b : Body) = new ULambda(fs, b)
+}
+
+class KLambda(fs : Formals, b : Body) extends Lambda(fs,b)
+
+object KLambda {
+  def apply(fs : Formals, b : Body) = new KLambda(fs, b)
+}
 
 case class If(val condition : Exp, ifTrue : Exp, ifFalse : Exp) extends Exp {
   override def toString = "(if " +condition +" "+ ifTrue +" "+ ifFalse + ")"
@@ -901,7 +917,7 @@ case class Begin(body : Body) extends Exp {
 }
 
 
-case class Undefined extends Exp {
+case class Undefined() extends Exp {
   override def toString = "'undefined"
 
   def isPure = true
@@ -912,7 +928,7 @@ case class Undefined extends Exp {
   lazy val free : ImmSet[SName] = ImmSet()
 }
 
-case class Void extends Exp {
+case class Void() extends Exp {
   override def toString = "(void)"
 
   def isPure = true
@@ -1033,7 +1049,7 @@ case class Bindings (val bindings : List[Binding]) {
   }
 }
 
-abstract case class LetForm (val bindings : Bindings, val body : Body) extends Exp {
+abstract class LetForm (val bindings : Bindings, val body : Body) extends Exp {
   def isPure = false
   def mustHalt = false
 
@@ -2157,8 +2173,8 @@ class MapStore(val map : SortedMap[Addr,D]) extends Store {
    */
   def + (addr : Addr, d : D) : MapStore = {
     map get addr match {
-      case Some(existingD) => new MapStore(map(addr) = d join existingD)
-      case None => new MapStore(map(addr) = d)
+      case Some(existingD) => new MapStore(map + (addr -> (d join existingD)))
+      case None => new MapStore(map + (addr -> d))
     }
   }
 
@@ -2313,7 +2329,7 @@ case class MapBEnv (val map : SortedMap[SName,Addr]) extends BEnv {
   }
   
   def update (name : SName, addr : Addr) : BEnv = 
-    MapBEnv(map(name) = addr)
+    MapBEnv(map + (name -> addr))
 
   def | (names : Iterable[SName]) : BEnv = MapBEnv(TreeMap[SName,Addr]() ++ (names map (n => (n,map(n)))))
     
@@ -2337,7 +2353,7 @@ class Parameters(val keywords : SortedMap[SKeyword,D], val positionals : List[D]
   def apply(position : Int) : D = positionals(position)
 
   def update(keyword : SKeyword, d : D) : Parameters = 
-    new Parameters(keywords(keyword) = d, positionals)
+    new Parameters(keywords + (keyword -> d), positionals)
 
   def :: (d : D) : Parameters =
     new Parameters(keywords, d :: positionals)
@@ -2531,7 +2547,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
                      } 
               states
             }
-          val states : List[State] = statess.flatMap[State](states => states)
+          val states : List[State] = statess.flatMap(states => states)
           states
         } else {
           List()
@@ -2604,25 +2620,25 @@ object Store {
     val set : SortedSet[Int] = TreeSet[Int]()
 
     for ((addr,d) <- store.toList) {
-      map = 
+      map =
         addr match {
           case FlatBind(name,_) => {
             (map get name) match {
-              case Some(flowSet) => map(name) = flowSet ++ (d.toList map (_.toSourceLabel))
-              case None => map(name) = set ++ (d.toList map (_.toSourceLabel))
+              case Some(flowSet) => map + (name -> (flowSet ++ (d.toList map (_.toSourceLabel))))
+              case None => map + (name -> (set ++ (d.toList map (_.toSourceLabel))))
             }
           }
           case MapBind(name,_) => {
             (map get name) match {
-              case Some(flowSet) => map(name) = flowSet ++ (d.toList map (_.toSourceLabel))
-              case None => map(name) = set ++ (d.toList map (_.toSourceLabel))
+              case Some(flowSet) => map + (name -> (flowSet ++ (d.toList map (_.toSourceLabel))))
+              case None => map + (name -> (set ++ (d.toList map (_.toSourceLabel))))
             }
           }
-          case _ => 
+          case _ =>
             map
         }
     }
-    
+
     map
   }
 
@@ -2646,7 +2662,7 @@ object Store {
 
   def crossAnalyze (flowMap1 : FlowMap, flowMap2 : FlowMap) {
     var scoreMap : SortedMap[SName,Score] = TreeMap[SName,Score]()
-    
+   
     for ((name,flows) <- flowMap1) {
       (flowMap1 get name,flowMap2 get name) match {
         case (Some(flows1),Some(flows2)) => {
@@ -2660,42 +2676,43 @@ object Store {
           println("lw: " + lw)
           println("rw: " + rw)
 
-          if (lw && rw) 
-            scoreMap = (scoreMap(name) = Tie)
-          else if (lw) 
-            scoreMap = (scoreMap(name) = LeftWins)
+          if (lw && rw)
+            scoreMap = (scoreMap + (name -> Tie))
+          else if (lw)
+            scoreMap = (scoreMap + (name -> LeftWins))
           else if (rw)
-            scoreMap = (scoreMap(name) = RightWins)
+            scoreMap = (scoreMap + (name -> RightWins))
           else
-            scoreMap = (scoreMap(name) = NeitherWins)
+            scoreMap = (scoreMap + (name -> NeitherWins))
         }
         case (Some(_), None) => {
-          scoreMap = (scoreMap(name) = RightWins)
+          scoreMap = (scoreMap + (name -> RightWins))
         }
         case (None,Some(_)) =>
-          scoreMap = (scoreMap(name) = LeftWins)
+          scoreMap = (scoreMap + (name -> LeftWins))
       }
     }
+
 
     for ((name,flows) <- flowMap2) {
       (flowMap1 get name,flowMap2 get name) match {
         case (Some(flows1),Some(flows2)) => {
           val lw = flows1 subsetOf flows2
           var rw = flows2 subsetOf flows1
-          if (lw && rw) 
-            scoreMap = (scoreMap(name) = Tie)
-          else if (lw) 
-            scoreMap = (scoreMap(name) = LeftWins)
+          if (lw && rw)
+            scoreMap = (scoreMap + (name -> Tie))
+          else if (lw)
+            scoreMap = (scoreMap + (name -> LeftWins))
           else if (rw)
-            scoreMap = (scoreMap(name) = RightWins)
+            scoreMap = (scoreMap + (name -> RightWins))
           else
-            scoreMap = (scoreMap(name) = NeitherWins)
+            scoreMap = (scoreMap + (name -> NeitherWins))
         }
         case (Some(_), None) => {
-          scoreMap = (scoreMap(name) = RightWins)
+          scoreMap = (scoreMap + (name -> RightWins))
         }
         case (None,Some(_)) =>
-          scoreMap = (scoreMap(name) = LeftWins)
+          scoreMap = (scoreMap + (name -> LeftWins))
       }
     }
 
@@ -2896,7 +2913,7 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
                      } 
               states
             }
-          val states : List[State] = statess.flatMap[State](states => states)
+          val states : List[State] = statess.flatMap(states => states)
           states
         } else {
           List()
