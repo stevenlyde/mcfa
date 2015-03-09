@@ -1,3 +1,4 @@
+package org.ucombinator
 
 import scala.collection.immutable.{Set => ImmSet,SortedMap,TreeMap,SortedSet,TreeSet}
 
