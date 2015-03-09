@@ -445,88 +445,7 @@ class SExpParser extends RegexParsers {
 
 
 
-object SExpTests {
 
-  def assert (test : => Boolean) {
-    if (!test) {
-      throw new Exception("Test failed!")
-    }
-  }
-
-  def main (args : Array[String]) {
-
-    import CommonSSymbols._ ;
-
-    val p = new SExpParser
-
-    if (args.length > 0) {
-
-      val filename = args(0)
-
-      // println("Testing s-expression parser on " + filename)
-
-      val lines = scala.io.Source.fromFile(filename).mkString("")
-
-      println(lines)
-
-      val sexps = p.parseAll(lines)
-      
-      println(sexps) 
-    }
-
-
-    assert (p.parse(";; Math routines \n (foo)").toString
-            ==
-            "(foo)") ;
-
-    assert (p.parse("3").toString
-            ==
-            "3") ;
-
-    assert (p.parse("()").toString
-            ==
-            "()") ;
-
-    assert (p.parse("foo").toString
-            ==
-            "foo") ;
-
-    assert (p.parse("(3)").toString
-            == 
-            "(3)") ;
-
-    assert (p.parse("( foo bar\n\n\t baz)").toString
-            == 
-            "(foo bar baz)") ;
-
-    assert (p.parse("foo ;bar").toString
-            == 
-            "foo") ;
-
-    assert (p.parse("(foo ;bar\n\n baz)").toString
-            == 
-            "(foo baz)") ;
-
-    assert (p.parse("(foo )").toString
-            == 
-            "(foo)") ;
-
-    assert (p.parse("(lambda)") match {
-      case SList(SLet) => false
-      case SList(SLambda) => true
-    })
-
-    
-    //println("parseAll test:")
-    //println(p.parseAll(";; Math routines \n (foo) (bar)").toString)
-
-    assert (p.parseAll(";; Math routines \n ; test \n (foo) (bar) ; baz\n").toString
-            ==
-            "List((foo), (bar))") ;
-            
-  }
-
-}
 
 
 
@@ -1341,47 +1260,6 @@ object RnRSParser {
 
 
 
-object RnRSParserTests {
-  def assert (test : => Boolean) {
-    if (!test) {
-      throw new Exception("Test failed!")
-    }
-  }
-  
-
-  def main (args : Array[String]) {
-
-    val sxp = new SExpParser
-    val p = new RnRSParser
-
-    if (args.length > 0) {
-
-      val filename = args(0)
-
-      System.err.println("Testing RnRSParser on " + filename)
-
-      val lines = scala.io.Source.fromFile(filename).mkString("")
-
-      // println(lines)
-
-      val sexps = sxp.parseAll(lines)
-      
-      val ast = p.parseProgram(sexps)
-
-      println (ast)
-    }
-
-    val prog = "(define (f x) x) (define v (f 10))"
-
-    val sprog = sxp.parseAll(prog)
-
-    val ast = p.parseProgram(sprog)
-
-    // println(ast)
-
-    ()
-  }
-}
 
 
 
@@ -1554,37 +1432,7 @@ object ANormalizer {
 
 
 
-object ANormalizerTests {
 
-
-  def main (args : Array[String]) {
-
-    val sxp = new SExpParser
-    val p = new RnRSParser
-    val t = new ANormalizer
-
-    if (args.length > 0) {
-
-      val filename = args(0)
-
-      System.err.println("Testing ANormalizer on " + filename)
-
-      val lines = scala.io.Source.fromFile(filename).mkString("")
-
-      // println(lines)
-
-      val sexps = sxp.parseAll(lines)
-      
-      val ast = p.parseProgram(sexps)
-
-      val anast = t.normalize(ast.toExp)
-
-      println (anast)
-    }
-    
-  }
-
-}
 
 
 
@@ -1762,32 +1610,7 @@ object CPSConverter {
 
 
 
-object CPSConverterTests {
-  
-  def main (args : Array[String]) { 
-    val sxp = new SExpParser
-    val p = new RnRSParser
-    val t = new ANormalizer
-    val c = new CPSConverter
-    
-    if (args.length > 0) {
 
-      val filename = args(0)
-
-      System.err.println("CPS-converting: " + filename)
-
-      val lines = scala.io.Source.fromFile(filename).mkString("")
-
-      val sexps = sxp.parseAll(lines)
-      val ast = p.parseProgram(sexps)
-      val anast = t.normalize(ast.toExp)
-      val cpast = c.convert(anast)
-      
-      println (cpast)
-    }
-    
-  }  
-}
 
 
 
