@@ -1,6 +1,6 @@
 package org.ucombinator
 
-import scala.collection.immutable.{Set => ImmSet,SortedMap,TreeMap,SortedSet,TreeSet}
+import scala.collection.immutable.{Set, SortedSet, TreeSet, SortedMap, TreeMap}
 
 import scala.util.parsing.combinator._ ;
 import scala.util.parsing.input.Positional  ;
@@ -487,7 +487,7 @@ abstract class Exp extends Ordered[Exp] {
 
   def isAtomic = isPure && mustHalt
 
-  def free : ImmSet[SName] ;
+  def free : Set[SName] ;
 
   def compare (that : Exp) = this.label compare that.label
 }
@@ -528,13 +528,13 @@ abstract class Formals {
 
   def keywords : List[KeywordFormal] ;
 
-  lazy val keywordSet : ImmSet[SKeyword] = ImmSet() ++ (keywords map (_.keyword))
+  lazy val keywordSet : Set[SKeyword] = Set() ++ (keywords map (_.keyword))
 
   def :: (formal : Formal) : Formals ;
 
   def accepts (args : Arguments) : Boolean ;
 
-  def bound : ImmSet[SName] ;
+  def bound : Set[SName] ;
 }
 
 abstract class Formal {
@@ -554,7 +554,7 @@ case class KeywordFormal(val keyword : SKeyword, val name : SName) extends Forma
 case class VarFormals(rest : SName) extends Formals {
   override def toString = rest.toString
   def :: (formal : Formal) = MultiFormals(List(formal),rest)
-  lazy val bound = ImmSet(rest)
+  lazy val bound = Set(rest)
 
   val positionals = List()
   val keywords = List()
@@ -565,7 +565,7 @@ case class VarFormals(rest : SName) extends Formals {
 case class MultiFormals(formals : List[Formal], rest : SName) extends Formals {
   override def toString = "(" + (formals mkString " ") + " . " + rest + ")"
   def :: (formal : Formal) = MultiFormals(formal :: formals, rest)
-  lazy val bound = ImmSet(rest) ++ (formals map (_.name))
+  lazy val bound = Set(rest) ++ (formals map (_.name))
   
   private val (_positionals,_keywords) = formals partition (_.isInstanceOf[PosFormal])
   
@@ -583,7 +583,7 @@ case class MultiFormals(formals : List[Formal], rest : SName) extends Formals {
 case class ListFormals(formals : List[Formal]) extends Formals {
   override def toString = "(" + (positionals mkString " ") + " " + (keywords mkString " ") + ")"
   def :: (formal : Formal) = ListFormals(formal :: formals)
-  lazy val bound = ImmSet() ++ (formals map (_.name))
+  lazy val bound = Set() ++ (formals map (_.name))
 
   private val (_positionals,_keywords) = formals partition (_.isInstanceOf[PosFormal])
   
@@ -604,9 +604,9 @@ abstract class Arguments {
   lazy val label = Term.allocateLabel()
   def positionals : List[PosArgument] ;
   def keywords : List[KeywordArgument] ;
-  lazy val keywordSet : ImmSet[SKeyword] = ImmSet() ++ (keywords map (_.keyword)) 
+  lazy val keywordSet : Set[SKeyword] = Set() ++ (keywords map (_.keyword))
   def :: (argument : Argument) : Arguments ;
-  def free : ImmSet[SName] ;
+  def free : Set[SName] ;
 }
 
 object InternalPrimArguments extends ListArguments(List(PosArgument(Undefined())))
@@ -614,17 +614,17 @@ object InternalPrimArguments extends ListArguments(List(PosArgument(Undefined())
 abstract class Argument {
   lazy val label = Term.allocateLabel()
   def exp : Exp ;
-  def free : ImmSet[SName] ;
+  def free : Set[SName] ;
 }
 
 case class PosArgument(val exp : Exp) extends Argument {
   override def toString = exp.toString
-  lazy val free : ImmSet[SName] = exp.free
+  lazy val free : Set[SName] = exp.free
 }
 
 case class KeywordArgument(val keyword : SKeyword, val exp : Exp) extends Argument {
   override def toString = keyword + " " + exp.toString
-  lazy val free : ImmSet[SName] = exp.free
+  lazy val free : Set[SName] = exp.free
 }
 
 case class ListArguments(val args : List[Argument]) extends Arguments {
@@ -632,7 +632,7 @@ case class ListArguments(val args : List[Argument]) extends Arguments {
   def :: (argument : Argument) : Arguments = 
     ListArguments(argument :: args)
 
-  lazy val free = ImmSet() ++ (args flatMap (_.free))
+  lazy val free = Set() ++ (args flatMap (_.free))
 
   private lazy val (_positionals,_keywords) = args partition (_.isInstanceOf[PosArgument])
 
@@ -654,9 +654,9 @@ case class Body (val defs : List[Def], val exps : List[Exp]) {
     LetRec(bindings,Body(List(),exps))
   }
 
-  lazy val free : ImmSet[SName] = {
+  lazy val free : Set[SName] = {
     val bound = defs map (_.name)
-    val free : ImmSet[SName] = ImmSet() ++ (defs flatMap (_.value.free)) 
+    val free : Set[SName] = Set() ++ (defs flatMap (_.value.free))
     (free ++ (exps flatMap (_.free))) -- bound
   }
 }
@@ -704,14 +704,14 @@ case class Ref(val name : SName) extends Exp {
 
   def isDuplicable = true 
 
-  lazy val free : ImmSet[SName] = ImmSet(name)
+  lazy val free : Set[SName] = Set(name)
 }
 
 abstract case class Lit(val sexp : SExp) extends Exp {
   def isPure = true 
   def mustHalt = true 
 
-  lazy val free : ImmSet[SName] = ImmSet()
+  lazy val free : Set[SName] = Set()
 }
 
 class SelfLit(val value : SExp) extends Lit(value) {
@@ -794,7 +794,7 @@ case class If(val condition : Exp, ifTrue : Exp, ifFalse : Exp) extends Exp {
   lazy val free = condition.free ++ ifTrue.free ++ ifFalse.free
 }
 
-case class Set(val name : SName, val value : Exp) extends Exp {
+case class SetBang(val name : SName, val value : Exp) extends Exp {
   override def toString = "(set! "+name+" "+value+")"
 
   def isPure = false
@@ -802,7 +802,7 @@ case class Set(val name : SName, val value : Exp) extends Exp {
 
   def isDuplicable = false 
 
-  lazy val free = ImmSet(name) ++ value.free
+  lazy val free = Set(name) ++ value.free
 }
 
 case class Values(exps : Arguments) extends Exp {
@@ -822,7 +822,7 @@ case class LetValues(formals : List[Formals], values : List[Exp], body : Body) e
 
   def isDuplicable = false 
 
-  lazy val free = ImmSet() ++ (values flatMap (_.free)) ++ (body.free -- (formals flatMap (_.bound)))
+  lazy val free = Set() ++ (values flatMap (_.free)) ++ (body.free -- (formals flatMap (_.bound)))
 }
 
 case class Begin(body : Body) extends Exp {
@@ -845,7 +845,7 @@ case class Undefined() extends Exp {
 
   def isDuplicable = true
 
-  lazy val free : ImmSet[SName] = ImmSet()
+  lazy val free : Set[SName] = Set()
 }
 
 case class Void() extends Exp {
@@ -856,7 +856,7 @@ case class Void() extends Exp {
 
   def isDuplicable = true
 
-  lazy val free : ImmSet[SName] = ImmSet()
+  lazy val free : Set[SName] = Set()
 }
 
 
@@ -879,7 +879,7 @@ case class And(exps : List[Exp]) extends Exp {
   def mustHalt = false
   def isDuplicable = false 
 
-  lazy val free = ImmSet() ++ (exps flatMap (_.free))
+  lazy val free = Set() ++ (exps flatMap (_.free))
 
   lazy val toIf : Exp = exps match {
     case List() => SelfLit(SBoolean(true))
@@ -895,7 +895,7 @@ case class Or(exps : List[Exp]) extends Exp {
   def mustHalt = false
   def isDuplicable = false 
 
-  lazy val free = ImmSet() ++ (exps flatMap (_.free))
+  lazy val free = Set() ++ (exps flatMap (_.free))
 
   lazy val toIf : Exp = exps match {
     case List() => SelfLit(SBoolean(false))
@@ -908,7 +908,7 @@ case class Or(exps : List[Exp]) extends Exp {
 
 
 abstract class CondClause {
-  def free : ImmSet[SName] ;
+  def free : Set[SName] ;
 }
 
 
@@ -926,7 +926,7 @@ case class ProcCondClause (val test : Exp, val proc : Exp) extends CondClause {
 }
 
 case class ElseCondClause (val exps : List[Exp]) extends CondClause {
-  lazy val free =  ImmSet() ++ (exps flatMap (_.free))
+  lazy val free =  Set() ++ (exps flatMap (_.free))
 }
 
 case class Cond(clauses : List[CondClause]) extends Exp {
@@ -936,7 +936,7 @@ case class Cond(clauses : List[CondClause]) extends Exp {
 
   def isDuplicable = false 
 
-  lazy val free = ImmSet() ++ (clauses flatMap (_.free))
+  lazy val free = Set() ++ (clauses flatMap (_.free))
 
   def toIf(clauses : List[CondClause]) : Exp = {
     clauses match {
@@ -985,7 +985,7 @@ case class Let (_bindings : Bindings, _body : Body) extends LetForm(_bindings,_b
 
   def this (name : SName, value : Exp, exp : Exp) = this(Bindings(List(Binding(name,value))),Body(List(),List(exp)))
 
-  lazy val free = ImmSet() ++ (bindings.values flatMap (_.free)) ++ (body.free -- (bindings.names))
+  lazy val free = Set() ++ (bindings.values flatMap (_.free)) ++ (body.free -- (bindings.names))
 
   def toLetStar = {
     val free = (bindings.values) flatMap (_.free)
@@ -1001,22 +1001,22 @@ case class LetRec (_bindings : Bindings, _body : Body) extends LetForm(_bindings
 
   lazy val toLetsAndSets : Exp = {
     val newBindings = bindings map (b => Binding(b.name,Undefined()))
-    val sets = bindings.bindings map (b => Set(b.name, b.value))
+    val sets = bindings.bindings map (b => SetBang(b.name, b.value))
     Let(newBindings,Body(List(),sets ++ List(Begin(body))))
   }
 
 
-  lazy val free = ImmSet() ++ (bindings.values flatMap (_.free)) ++ body.free -- bindings.names
+  lazy val free = Set() ++ (bindings.values flatMap (_.free)) ++ body.free -- bindings.names
 }
 
 case class LetStar (_bindings : Bindings, _body : Body) extends LetForm(_bindings,_body) {
   override def toString = toString("let*")
 
-  private def freeIn (bindings : List[Binding],body : Body) : ImmSet[SName] = {
+  private def freeIn (bindings : List[Binding],body : Body) : Set[SName] = {
     if (bindings isEmpty)
       body.free
     else
-      ImmSet() ++ bindings.head.value.free ++ (freeIn(bindings.tail,body) - bindings.head.name)
+      Set() ++ bindings.head.value.free ++ (freeIn(bindings.tail,body) - bindings.head.name)
   }
 
   lazy val toLets : Exp = bindings match {
@@ -1106,7 +1106,7 @@ class RnRSParser {
 
       // Side effects and sequencing:
       case SSetBang :+: (name : SName) :+: value :+: SNil() =>
-        Set(name,parseExp(value))
+        SetBang(name,parseExp(value))
       case SBegin :+: body =>
         Begin(parseBody(body))
 
@@ -1324,9 +1324,9 @@ class ANormalizer {
       case lets @ LetStar(_,_) => 
         normalizeExp (lets.toLets) (k)
 
-      case Set(name,value) => 
+      case SetBang(name,value) =>
         normalizeLinearName (value) (value =>
-          Seq(Set(name,value),
+          Seq(SetBang(name,value),
               k(Void())))
 
       case Begin(ExpBody(exp)) => 
@@ -1507,9 +1507,9 @@ class CPSConverter {
                convertQExp (ifFalse) (q))))
       }
 
-      case Set(name,value) => 
+      case SetBang(name,value) =>
         convertExp (value) (value =>
-          Seq(Set(name,value),
+          Seq(SetBang(name,value),
               new App(q,Void())))
 
       case Begin(body) => 
@@ -2323,7 +2323,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
         }
       }
 
-      case State(CFlat(exp @ Seq(Set(name,value),call),bEnv,t),StoreSharp(store)) => {
+      case State(CFlat(exp @ Seq(SetBang(name,value),call),bEnv,t),StoreSharp(store)) => {
         val d = atomEval (bEnv,store) (value)
 
         val newStore = (store(bEnv(name)) = d)
@@ -2736,7 +2736,7 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
         }
       }
 
-      case State(CFlat(exp @ Seq(Set(name,value),call),bEnv,t),StoreSharp(store)) => {
+      case State(CFlat(exp @ Seq(SetBang(name,value),call),bEnv,t),StoreSharp(store)) => {
         val d = atomEval (bEnv,store) (value)
 
         val newStore = (store(bEnv(name)) = d)
