@@ -36,27 +36,9 @@ case object StuckFlat extends Flat {
 }
 
 
-abstract class DeltaSharp {
-  def isEmpty : Boolean ;
-
-  def apply(sharp : Sharp) : Sharp ;
-}
-
-/*
-case object NullDeltaSharp extends DeltaSharp {
-  override isEmpty = true
-  
-  def apply(sharp : Sharp) : Sharp = sharp
-}
-*/
 
 
-trait Sharp {
-  def wt (that : Sharp) : Boolean ;
 
-  def resetChangeLog : Sharp ;
-  def changeLog : DeltaSharp ;
-}
 
 
 
@@ -207,94 +189,11 @@ trait D {
 /* Generics components */
 
 
-case class StoreUpdate (val isStrong : Boolean, val addr : Addr, val d : D) {
-  def apply(sharp : Sharp) : Sharp = {
-    sharp match {
-      case StoreSharp(store) => 
-        if (isStrong)
-          new StoreSharp (store(addr) = d)
-        else
-          new StoreSharp (store + (addr,d))
-    }
-  }
-}
-
-case class StoreUpdateDeltaSharp (val changeLog : List[StoreUpdate]) extends DeltaSharp {
-  def isEmpty = changeLog.isEmpty
-
-  def apply (sharp : Sharp) : Sharp = 
-    changeLog.foldLeft (sharp) ((sharp,update) => update(sharp))
-}
-
-class SentinelStore(val changeLog : List[StoreUpdate], val store : Store) extends Store {
-
-  def this (store : Store) = this(List(), store)
-
-  def get (addr : Addr) = store get addr
-  def wt (that : Store) = that match {
-    case thatStore : SentinelStore => store wt thatStore.store
-    case _ => store wt that
-  }
-
-  def resetLog() = 
-    new SentinelStore(List(), store)
-
-  def + (addr : Addr, d : D) : SentinelStore = {
-    (store get addr) match {
-      case Some(d2) if (d wt d2) => this
-      case _ => {
-        new SentinelStore(StoreUpdate(false,addr,d) :: changeLog, store + (addr,d))
-      }
-    }
-  }
-
-  def update (addr : Addr, d : D) : SentinelStore = {
-    (store get addr) match {
-      case Some(d2) if (d wt d2) => this
-      case _ => {
-        new SentinelStore(StoreUpdate(true,addr,d) :: changeLog, store(addr) = d)
-      }
-    }
-  }
-
-  override def toString = store.toString
-
-  def toList = store.toList
-}
 
 
-class MapStore(val map : SortedMap[Addr,D]) extends Store {
-  def this () = this(TreeMap())
 
-  def get(addr : Addr) : Option[D] = map get addr
 
-  def wt (that : Store) = that match {
-    case _ => throw new Exception("Unknown store type")
-  }
 
-  /**
-   Weak update.
-   */
-  def + (addr : Addr, d : D) : MapStore = {
-    map get addr match {
-      case Some(existingD) => new MapStore(map + (addr -> (d join existingD)))
-      case None => new MapStore(map + (addr -> d))
-    }
-  }
-
-  /**
-   A simple store does not contain enough information to determine whether a strong update is safe or not, so
-   this operation always performs a weak update.
-   */
-  def update (addr : Addr, d : D) : Store = {
-    // We don't have enough information to do a strong update, so we fall back to a weak update.
-    this + (addr,d)
-  }
-
-  override def toString = "\n " +  (map mkString "\n ") 
-
-  def toList : List[(Addr,D)] = map.toList
-}
 
 
 case class SortedSetD (set : SortedSet[Value]) extends D {
@@ -317,27 +216,7 @@ case class SortedSetD (set : SortedSet[Value]) extends D {
 
 
 
-case class StoreSharp(val store : Store) extends Sharp {
 
-  def resetChangeLog = {
-    if (store.isInstanceOf[SentinelStore])
-      new StoreSharp(new SentinelStore(store.asInstanceOf[SentinelStore].store))
-    else
-      new StoreSharp(new SentinelStore(store))
-  }
-  
-  def changeLog = {
-    if (store.isInstanceOf[SentinelStore])
-      StoreUpdateDeltaSharp(store.asInstanceOf[SentinelStore].changeLog)
-    else
-      throw new Exception()
-  }
-
-  def wt (that : Sharp) : Boolean = that match {
-    case StoreSharp(thatStore) => store wt thatStore
-    case _ => throw new Exception("Can't compare sharps!")
-  }
-}
 
 
 
