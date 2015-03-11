@@ -72,8 +72,8 @@ trait SmallStepAbstractInterpretation {
             // Apply sharp changes to the global store:
             globalSharp = delta(globalSharp)
           }
-          todo = succs ++ todo 
         }
+        todo = succs ++ todo
       }
     }
 
