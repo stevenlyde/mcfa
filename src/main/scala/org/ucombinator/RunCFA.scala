@@ -47,6 +47,10 @@ object RunCFA {
     System.out.println(cpast.free)
     System.out.println("\n")
 
+    val labeler = new ExpressionFold
+    val variables = labeler.label(cpast)
+    val types = labeler.types(cpast)
+
     opts.analysis match {
      case "full" => { 
        val CFA = new KCFA_CPS(cpast,new MapBEnv(TreeMap()), KTime(List()), new MapStore(), new SortedSetD())
@@ -72,7 +76,13 @@ object RunCFA {
        val inlinable = Store.countInlinable(flows)
        println ("inlinable: " + inlinable)
      }
-      
+     case "henglein" => {
+       val henglein = new Henglein(variables)
+       val ps = henglein.run(cpast)
+       val flows = DisjointSetSummary.condense(ps, variables, types)
+       val inlinable = Store.countInlinable(flows)
+       println ("inlinable: " + inlinable)
+     }
      case "compare-m-poly-1" => {
        val P1CFA = new MCFA_CPS(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
        P1CFA.k = 1
