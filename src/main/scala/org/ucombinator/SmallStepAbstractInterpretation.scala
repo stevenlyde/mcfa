@@ -1,5 +1,7 @@
 package org.ucombinator
 
+import collection.mutable.PriorityQueue
+
 trait SmallStepAbstractInterpretation {
   def initialState: State;
   def next(state: State): List[State];
@@ -9,13 +11,19 @@ trait SmallStepAbstractInterpretation {
   var count = 0
   var globalSharp: Sharp = null
 
+  def value(s: State): Long = s match {
+    case State(CFlat(exp, env, t), StoreSharp(store)) =>
+      exp.label
+  }
+
   def runWithGlobalSharp() {
     // seen records the last generation store seen with this flat.
     val seen = scala.collection.mutable.HashMap[Flat, Long]()
     var currentGeneration: Long = 1
 
     val init = initialState
-    var todo = List(init)
+    var todo = new PriorityQueue[State]()(Ordering[Long].on(value))
+    todo += init
 
     globalSharp = init.sharp
     var timeout = -1
@@ -73,7 +81,7 @@ trait SmallStepAbstractInterpretation {
             globalSharp = delta(globalSharp)
           }
         }
-        todo = succs ++ todo
+        todo ++= succs
       }
     }
 
