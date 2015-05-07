@@ -27,6 +27,11 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
+  def addrEval (bEnv : BEnv, time : Time) (exp : Exp) : Addr = exp match {
+    case Ref(name) => bEnv(name)
+    case _ => ParamAddr(exp.label, time)
+  }
+
   def inject (exp : Exp) : State = {
     State(CFlat(exp,bEnv1,t0),StoreSharp(store1))
   }
@@ -35,27 +40,27 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
   def tick (call : Exp, t : Time) : Time = t.succ(k,call.label)
 
-  def evalArgs (args : Arguments, bEnv : BEnv, store : Store) : Parameters = {
+  def evalArgs[A] (args : Arguments, eval : Exp => A)  : Parameters[A] = {
     args match {
-      case ListArguments(arglist) => evalArgs (new Parameters()) (arglist,bEnv,store)
+      case ListArguments(arglist) => evalArgs (new Parameters()) (arglist, eval)
     }
   }
 
-  def evalArgs (parameters : Parameters) (arglist : List[Argument], bEnv : BEnv, store : Store) : Parameters = {
+  def evalArgs[A] (parameters : Parameters[A]) (arglist : List[Argument], eval : Exp => A) : Parameters[A] = {
     arglist match {
       case Nil => parameters
       case hd :: tl => {
-        val p = evalArgs (parameters) (tl,bEnv,store)
+        val p = evalArgs (parameters) (tl, eval)
         hd match {
-          case PosArgument(exp) => (atomEval (bEnv,store) (exp)) :: p
-          case KeywordArgument(kw,exp) => p(kw) = atomEval (bEnv,store) (exp)
+          case PosArgument(exp) => (eval(exp)) :: p
+          case KeywordArgument(kw,exp) => p(kw) = eval(exp)
         }
       }
     }
   }
 
 
-  private def applyProcedure (args : Arguments, params : Parameters, store : Store, newTime : Time) (proc : Value) : List[State] = {
+  private def applyProcedure (args : Arguments, params : Parameters[D], paddrs : Parameters[Addr], store : Store, newTime : Time) (proc : Value) : List[State] = {
     proc match {
       
       case Clo(lam @ Lambda(VarFormals(name),ExpBody(call)),bEnv2) if !(call.free contains name)  => {
@@ -68,16 +73,20 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
         var newBEnv = bEnv2
         
         // Bind positional arguments:
-        for ((PosFormal(name),d) <- formals.positionals zip params.positionals) {
+        for ((PosFormal(name), d, paddr) <- (formals.positionals, params.positionals, paddrs.positionals).zipped) {
           // TODO: Un-hard-code the MapBind; factor into alloc
-          newBEnv = (newBEnv(name) = MapBind(name,newTime))
-          newStore += (newBEnv(name), d)
+          val addr = MapBind(name,newTime)
+          newBEnv = (newBEnv(name) = addr)
+          newStore += (addr, d)
+          newStore = newStore union (addr, paddr)
         }
         
         // Bind keyword arguments:
         for (KeywordFormal(keyword,name) <- formals.keywords) {
-          newBEnv = (newBEnv(name) = MapBind(name,newTime))
-          newStore += (newBEnv(name), params(keyword))
+          val addr = MapBind(name,newTime)
+          newBEnv = (newBEnv(name) = addr)
+          newStore += (addr, params(keyword))
+          newStore = newStore union (addr, paddrs(keyword))
         }
         
         if (formals.positionals.length < params.positionals.length) {
@@ -85,23 +94,25 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           val remainder = params.positionals.drop(formals.positionals.length)
           throw new Exception(exp + "\nv.\n" + lam)
         }
-        
+
         List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
       }
 
       
       case PrimValue("*"|"+"|"-"|"/"|"quotient"|"gcd"|"modulo") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = botD :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = botD :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
 
       case PrimValue("ceiling"|"log"|"length"|"char->integer") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = botD :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = botD :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
@@ -109,32 +120,36 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
       case PrimValue("string-append"|"number->string"|"string-ref"|"string-length"|"list->string"|"symbol->string") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = botD :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = botD :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
 
       case PrimValue("string->symbol") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = botD :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = botD :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
 
       case PrimValue("display"|"newline") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = botD :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = botD :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
 
       case PrimValue("random") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = botD :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = botD :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
@@ -145,7 +160,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
         else {
           val conts = params(SKeyword.from("cc"))
           val loc = ConsLocation(newTime)
-          val primParams = (botD + loc) :: (new Parameters())
+          val primParams = (botD + loc) :: (new Parameters[D]())
           val carD = params(0)
           var cdrD = params(1)
           val carAddr = FieldAddr(loc,SName.from("car"))
@@ -153,7 +168,8 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           var newStore = store
           newStore = (newStore(carAddr) = carD)
           newStore = (newStore(cdrAddr) = cdrD)
-          for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+          val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+          for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
             succ
           }
         }
@@ -163,8 +179,9 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
                      "string?"|
                      "symbol?"|"pair?"|"list?"|"null?"|"number?"|"integer?"|"<"|"="|">"|"<="|">=") => {
         val conts = params(SKeyword.from("cc"))
-        val primParams = (botD + BooleanValue(true) + BooleanValue(false)) :: (new Parameters())
-        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+        val primParams = (botD + BooleanValue(true) + BooleanValue(false)) :: (new Parameters[D]())
+        val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
+        for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
           succ
         }
       }
@@ -177,10 +194,11 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
             for (cellLoc <- cellLocs.toList if cellLoc.isObjectLocation) yield {
               val loc = cellLoc.asInstanceOf[ObjectLocation]
               val fieldValue = store.getOrElse(FieldAddr(loc,SName.from("cons")),botD)
-              val primParams = fieldValue :: (new Parameters())
+              val primParams = fieldValue :: (new Parameters[D]())
+              val addrParams = ParamAddr(proc.toSourceLabel, newTime) :: (new Parameters[Addr]())
               val states : List[State] = 
                 for (cont <- conts.toList; 
-                     succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+                     succ <- applyProcedure (InternalPrimArguments,primParams,addrParams,store,newTime) (cont)) yield {
                        succ
                      } 
               states
@@ -194,6 +212,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
       case PrimValue("error") => List()
 
+      case _ => List() // imprecision might force the arguments to not be accepted anymore
 
     }
   }
@@ -205,12 +224,13 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
       
       case State(CFlat(exp @ App(f,args),bEnv,t),StoreSharp(store)) => {
         val procs = atomEval (bEnv,store) (f)
-        val params = evalArgs (args,bEnv,store)
+        val params = evalArgs (args, atomEval(bEnv, store))
+        val addrs = evalArgs (args, addrEval(bEnv, t))
         val newTime = tick(exp,t)
-        for (procValue <- procs.toList if procValue.isProcedure; 
-             succ <- applyProcedure (args,params,store,newTime) (procValue)) yield {
-          succ
-        }
+        for {
+          procValue <- procs.toList if procValue.isProcedure
+          succ <- applyProcedure (args,params,addrs,store,newTime) (procValue)
+        } yield succ
       }
 
       case State(CFlat(exp @ If(condition,ifTrue,ifFalse),bEnv,t),StoreSharp(store)) => {
@@ -222,8 +242,10 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
       case State(CFlat(exp @ Seq(SetBang(name,value),call),bEnv,t),StoreSharp(store)) => {
         val d = atomEval (bEnv,store) (value)
+        val da = addrEval (bEnv,t) (value)
 
-        val newStore = (store(bEnv(name)) = d)
+        val a = bEnv(name)
+        val newStore = (store(a) = d) union (a, da)
 
         List(State(CFlat(call,bEnv,t),StoreSharp(newStore)))
       }

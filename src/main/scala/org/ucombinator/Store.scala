@@ -27,6 +27,10 @@ trait Store {
   def update (addr : Addr, d : D) : Store ;
 
   def toList : List[(Addr,D)] ;
+
+  def find(a : Addr): Addr ;
+
+  def union (a1 : Addr, a2 : Addr) : Store ;
 }
 
 object Store {

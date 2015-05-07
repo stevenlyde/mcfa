@@ -282,6 +282,14 @@ case class MapBind (val name : SName, val time : Time) extends Addr {
   }
 }
 
+case class ParamAddr (val label : Int, val time : Time) extends Addr {
+  def localCompare (that : Addr) : Int = that match {
+    case ParamAddr(thatLabel,thatTime) =>
+      if (label - thatLabel != 0) label - thatLabel else time compare thatTime
+  }
+}
+
+
 case class MapBEnv (val map : SortedMap[SName,Addr]) extends BEnv {
   def apply (name : SName) = map(name)
   def succ (m : Int, l : Int) = throw new Exception("Not appropriate in this context.")

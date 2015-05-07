@@ -51,13 +51,13 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
   }
 
 
-  def evalArgs (args : Arguments, bEnv : BEnv, store : Store) : Parameters = {
+  def evalArgs (args : Arguments, bEnv : BEnv, store : Store) : Parameters[D] = {
     args match {
       case ListArguments(arglist) => evalArgs (new Parameters()) (arglist,bEnv,store)
     }
   }
 
-  def evalArgs (parameters : Parameters) (arglist : List[Argument], bEnv : BEnv, store : Store) : Parameters = {
+  def evalArgs (parameters : Parameters[D]) (arglist : List[Argument], bEnv : BEnv, store : Store) : Parameters[D] = {
     arglist match {
       case Nil => parameters
       case hd :: tl => {
@@ -71,7 +71,7 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
   }
 
 
-  private def applyProcedure (allocBEnv : (Lambda,BEnv) => BEnv) (args : Arguments, params : Parameters, store : Store, newTime : Time) (proc : Value) : List[State] = {
+  private def applyProcedure (allocBEnv : (Lambda,BEnv) => BEnv) (args : Arguments, params : Parameters[D], store : Store, newTime : Time) (proc : Value) : List[State] = {
     proc match {
 
       case PrimValue("*"|"+"|"-"|"/"|"quotient"|"gcd"|"modulo") => {
