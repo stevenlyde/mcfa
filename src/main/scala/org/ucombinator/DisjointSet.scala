@@ -28,7 +28,7 @@ class DisjointSet[A](id: Map[A, A], sz: Map[A, Int]) {
     }
     else {
       id(j) = i
-      sz(i) = +sz(j)
+      sz(i) += sz(j)
       i
     }
   }
