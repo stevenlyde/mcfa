@@ -24,12 +24,31 @@ case class Constructor(val keywords: SortedMap[SKeyword, Int], val positionals: 
   def ::(label: Int): Constructor =
     new Constructor(keywords, label :: positionals)
 
-  val ctype: ConstructorType = ConstructorType(positionals.length, keywords.keySet)
+  var label: Int = 0
+  def setLabel(label: Int) { this.label = label }
+
+  lazy val index = ConstructorType.indexOf(positionals.length, keywords.keySet)
 
 }
 
 case class ConstructorType(arity: Int, keywords: Set[SKeyword])
 
+object ConstructorType {
+
+  var count = 0
+  val ids = MutableMap[ConstructorType, Int]()
+
+  def indexOf(arity: Int, keywords: Set[SKeyword]): Int = {
+    ids.getOrElseUpdate(ConstructorType(arity, keywords), {
+      val i = count
+      count += 1
+      i
+    })
+  }
+
+  def getCount = count
+
+}
 
 class Henglein(vs: Map[SName, Int]) {
 
@@ -62,6 +81,7 @@ class Henglein(vs: Map[SName, Int]) {
 
     case App(f, ListArguments(args)) =>
       val c = argsConstructor(args)
+      c.index
       val newConstraints = generateConstraints(f, InequalityConstraint(c, labelOf(f)) :: cs)
       args.foldLeft(newConstraints)((cs, arg) => arg match {
         case PosArgument(exp) => generateConstraints(exp, cs)
@@ -70,6 +90,7 @@ class Henglein(vs: Map[SName, Int]) {
 
     case Lambda(formals, ExpBody(body)) =>
       val c = formalsConstructor(formals)
+      c.index
       generateConstraints(body, InequalityConstraint(c, labelOf(e)) :: cs)
 
     case Seq(SetBang(name, value), call) =>
@@ -94,25 +115,38 @@ class Henglein(vs: Map[SName, Int]) {
     lst1 ++ lst2
   }
 
-  def updateConstructors(cs1: MutableMap[ConstructorType, Constructor],
-                         cs2: MutableMap[ConstructorType, Constructor], a: Label): List[Constraint] = {
+  def updateConstructors(cs1: Int, cs2: Int, leqs: Array[Constructor], constructorTypeCount: Int): List[Constraint] = {
     var constraints = List[Constraint]()
-    for ((t, c) <- cs2) {
-      if (cs1.contains(t)) constraints = InequalityConstraint(c, a) :: constraints
-      else cs1(t) = c
+    for (i <- 0 until constructorTypeCount) {
+      if (leqs(cs2 + i) != null) {
+        if (leqs(cs1 + i) != null) {
+          constraints = InequalityConstraint(leqs(cs2 + i), cs1) :: constraints
+        }
+        else {
+          leqs(cs1 + i) = leqs(cs2 + i)
+        }
+      }
     }
     constraints
   }
 
-  def normalize(cs: List[Constraint]): DisjointSet[Label] = {
+  def normalize(cs: List[Constraint]): ArrayDisjointSet = {
     var worklist = cs
 
-    val count = Term.allocateLabel() - 1
-    val sets = new DisjointSet[Label](1 to count)
-    val csets = new DisjointSet[Constructor](cs.collect { case InequalityConstraint(c, a) => c })
-    val leqs = (1 to count).foldLeft(Map[Label, MutableMap[ConstructorType, Constructor]]())((leqs, label) => {
-      leqs.updated(label, MutableMap())
-    })
+    val labelCount = Term.allocateLabel() - 1
+    val constructorTypeCount =  ConstructorType.getCount
+
+    val constructorCount = cs.length
+    val constructors = new Array[Constructor](constructorCount)
+    for ((InequalityConstraint(c, a), i) <- cs.zipWithIndex) {
+      c.setLabel(i)
+      constructors(i) = c
+    }
+
+    val sets = new ArrayDisjointSet(labelCount + 1)
+    val csets = new ArrayDisjointSet(constructorCount)
+
+    val leqs = new Array[Constructor]((labelCount + 1) * constructorTypeCount)
 
     while (!worklist.isEmpty) {
       val current = worklist.head
@@ -120,16 +154,14 @@ class Henglein(vs: Map[SName, Int]) {
       current match {
 
         case InequalityConstraint(c, a) =>
-          val cc = csets.find(c)
+          val cc = constructors(csets.find(c.label))
           val ca = sets.find(a)
-          val constructors = leqs(ca)
-          val constructorType = cc.ctype
-          if (!constructors.contains(constructorType))
-            constructors(constructorType) = cc
+          if (leqs(ca * constructorTypeCount + cc.index) == null)
+            leqs(ca * constructorTypeCount + cc.index) = cc
           else {
-            val cl = constructors(constructorType)
+            val cl = constructors(csets.find(leqs(ca * constructorTypeCount + cc.index).label))
             if (cc != cl) {
-              csets.union(cc, cl)
+              csets.union(cc.label, cl.label)
               worklist ++= constructorConstraints(cc, cl)
             }
           }
@@ -139,11 +171,11 @@ class Henglein(vs: Map[SName, Int]) {
           val ca2 = sets.find(a2)
           if (ca1 != ca2) {
             val ca = sets.union(ca1, ca2)
-            worklist ++= updateConstructors(leqs(ca), leqs(if (ca == ca1) ca2 else ca1), ca)
+            worklist ++= updateConstructors(ca, if (ca == ca1) ca2 else ca1, leqs, constructorTypeCount)
           }
       }
     }
-
+    
     sets
   }
 
