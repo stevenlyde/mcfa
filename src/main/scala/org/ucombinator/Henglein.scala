@@ -118,9 +118,9 @@ class Henglein(vs: Map[SName, Int]) {
   def updateConstructors(cs1: Int, cs2: Int, leqs: Array[Constructor], constructorTypeCount: Int): List[Constraint] = {
     var constraints = List[Constraint]()
     for (i <- 0 until constructorTypeCount) {
-      if (leqs(cs2 + i) != null) {
-        if (leqs(cs1 + i) != null) {
-          constraints = InequalityConstraint(leqs(cs2 + i), cs1) :: constraints
+      if (leqs(cs2 * constructorTypeCount + i) != null) {
+        if (leqs(cs1 * constructorTypeCount + i) != null) {
+          constraints = InequalityConstraint(leqs(cs2 * constructorTypeCount + i), cs1) :: constraints
         }
         else {
           leqs(cs1 + i) = leqs(cs2 + i)
