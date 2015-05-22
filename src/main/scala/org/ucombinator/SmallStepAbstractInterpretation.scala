@@ -20,7 +20,7 @@ trait SmallStepAbstractInterpretation {
     val seen = scala.collection.mutable.HashMap[Flat, Long]()
     var currentGeneration: Long = 1
 
-    var priority = 0
+    var priority = Int.MaxValue
 
     val init = initialState
     val todo = new PriorityQueue[OrderedState]()
@@ -81,8 +81,8 @@ trait SmallStepAbstractInterpretation {
             globalSharp = delta(globalSharp)
           }
         }
-        todo ++= succs.reverse.map(state => {
-          priority += 1
+        todo ++= succs.map(state => {
+          priority -= 1
           OrderedState(state, priority)
         })
       }
