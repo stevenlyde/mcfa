@@ -20,9 +20,11 @@ trait SmallStepAbstractInterpretation {
     val seen = scala.collection.mutable.HashMap[Flat, Long]()
     var currentGeneration: Long = 1
 
+    var priority = 0
+
     val init = initialState
     val todo = new PriorityQueue[OrderedState]()
-    todo.enqueue(OrderedState(init, 0))
+    todo.enqueue(OrderedState(init, priority))
 
     globalSharp = init.sharp
     var timeout = -1
@@ -79,7 +81,10 @@ trait SmallStepAbstractInterpretation {
             globalSharp = delta(globalSharp)
           }
         }
-        todo ++= succs.map(OrderedState(_, 0))
+        todo ++= succs.reverse.map(state => {
+          priority += 1
+          OrderedState(state, priority)
+        })
       }
     }
 
