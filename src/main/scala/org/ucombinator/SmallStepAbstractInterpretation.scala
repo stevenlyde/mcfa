@@ -11,9 +11,8 @@ trait SmallStepAbstractInterpretation {
   var count = 0
   var globalSharp: Sharp = null
 
-  def value(s: State): Long = s match {
-    case State(CFlat(exp, env, t), StoreSharp(store)) =>
-      exp.label
+  case class OrderedState(state: State, priority: Int) extends Ordered[OrderedState] {
+    override def compare(that: OrderedState): Int = priority - that.priority
   }
 
   def runWithGlobalSharp() {
@@ -22,15 +21,14 @@ trait SmallStepAbstractInterpretation {
     var currentGeneration: Long = 1
 
     val init = initialState
-    var todo = new PriorityQueue[State]()(Ordering[Long].on(value))
-    todo += init
+    val todo = new PriorityQueue[OrderedState]()
+    todo.enqueue(OrderedState(init, 0))
 
     globalSharp = init.sharp
     var timeout = -1
 
     while (!todo.isEmpty && timeout != 0) {
-      var newState = todo.head
-      todo = todo.tail
+      var newState = todo.dequeue().state
 
       val flat = newState.flat
       val sharp = newState.sharp
@@ -81,7 +79,7 @@ trait SmallStepAbstractInterpretation {
             globalSharp = delta(globalSharp)
           }
         }
-        todo ++= succs
+        todo ++= succs.map(OrderedState(_, 0))
       }
     }
 
