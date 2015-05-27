@@ -18,7 +18,7 @@ trait SmallStepAbstractInterpretation {
 
     val init = initialState
     val todo = new PriorityQueue[OrderedState]()
-    val assignment: PriorityAssignment = new DepthFirstSearchPriorityAssignment
+    val assignment: PriorityAssignment = new ExpressionTypePriorityAssignment
     todo ++= assignment.prioritize(List(init), init.sharp)
 
     globalSharp = init.sharp

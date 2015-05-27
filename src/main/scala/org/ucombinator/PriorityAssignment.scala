@@ -5,7 +5,7 @@ case class OrderedState(state: State, priority: Int) extends Ordered[OrderedStat
 }
 
 trait PriorityAssignment {
-  
+
   def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState]
 
 }
@@ -41,6 +41,23 @@ class ConstantPriorityAssignment extends PriorityAssignment {
   def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
     states.map(state => {
       OrderedState(state, 0)
+    })
+  }
+
+}
+
+class ExpressionTypePriorityAssignment extends PriorityAssignment {
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    states.map(state => state match {
+      case State(CFlat(exp, _, _), _) =>
+        val priority = exp match {
+          case App(_, _) => 3
+          case If(_, _, _) => 2
+          case Seq(_) => 1
+          case _ => 0
+        }
+        OrderedState(state, priority)
     })
   }
 
