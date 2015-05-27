@@ -11,20 +11,15 @@ trait SmallStepAbstractInterpretation {
   var count = 0
   var globalSharp: Sharp = null
 
-  case class OrderedState(state: State, priority: Int) extends Ordered[OrderedState] {
-    override def compare(that: OrderedState): Int = priority - that.priority
-  }
-
   def runWithGlobalSharp() {
     // seen records the last generation store seen with this flat.
     val seen = scala.collection.mutable.HashMap[Flat, Long]()
     var currentGeneration: Long = 1
 
-    var priority = Int.MaxValue
-
     val init = initialState
     val todo = new PriorityQueue[OrderedState]()
-    todo.enqueue(OrderedState(init, priority))
+    val assignment: PriorityAssignment = new DepthFirstSearchPriorityAssignment
+    todo ++= assignment.prioritize(List(init), init.sharp)
 
     globalSharp = init.sharp
     var timeout = -1
@@ -81,10 +76,7 @@ trait SmallStepAbstractInterpretation {
             globalSharp = delta(globalSharp)
           }
         }
-        todo ++= succs.map(state => {
-          priority -= 1
-          OrderedState(state, priority)
-        })
+        todo ++= assignment.prioritize(succs, globalSharp)
       }
     }
 
