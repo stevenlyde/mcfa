@@ -198,3 +198,21 @@ class ArgumentFlowSetPriorityAssignment extends PriorityAssignment {
 
 }
 
+class ExpressionFrequencyPriorityAssignment extends PriorityAssignment {
+
+  val m: IdentityHashMap[Exp, Int] = new IdentityHashMap()
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    val StoreSharp(store) = globalSharp
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(exp, _, _), _) =>
+          val oldCount = m.get(exp)
+          val newCount = if (oldCount == null) 1 else oldCount + 1
+          m.put(exp, newCount)
+      }
+      OrderedState(state, Int.MaxValue - priority)
+    })
+  }
+
+}
