@@ -3,6 +3,7 @@ package org.ucombinator
 import java.util.IdentityHashMap
 
 import scala.collection.immutable.TreeMap
+import scala.collection.mutable.Queue
 
 case class OrderedState(state: State, priority: Int) extends Ordered[OrderedState] {
   override def compare(that: OrderedState): Int = priority - that.priority
@@ -293,6 +294,58 @@ class DepthFirstLabelPriorityAssignment extends PriorityAssignment {
         case State(CFlat(exp, _, _), _) => exp.label
       }
       OrderedState(state, priority)
+    })
+  }
+
+}
+
+
+class BreadthFirstLabelPriorityAssignment extends PriorityAssignment {
+
+  override def initialize(s: State): Unit = {
+    val State(CFlat(exp, _, _), _) = s
+    fold(exp)
+  }
+
+  private def fold(e: Exp): Unit = {
+    val q = new Queue[Exp]()
+    q.enqueue(e)
+
+    while (!q.isEmpty) {
+      val current = q.dequeue()
+      current.label
+      current match {
+        case App(f, args) =>
+          q.enqueue(f)
+          args.positionals.foreach(arg => q.enqueue(arg.exp))
+          args.keywords.foreach(arg => q.enqueue(arg.exp))
+
+        case Lambda(formals, ExpBody(body)) =>
+          q.enqueue(body)
+
+        case Seq(SetBang(name, value), call) =>
+          q.enqueue(value)
+          q.enqueue(call)
+
+        case If(condition, ifTrue, ifFalse) =>
+          q.enqueue(condition)
+          q.enqueue(ifTrue)
+          q.enqueue(ifFalse)
+
+        case Ref(name) =>
+        case Lit(value) =>
+        case Void() =>
+        case Undefined() =>
+      }
+    }
+  }
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(exp, _, _), _) => exp.label
+      }
+      OrderedState(state, Int.MaxValue - priority)
     })
   }
 
