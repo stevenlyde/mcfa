@@ -175,4 +175,26 @@ class BranchingFactorPriorityAssignment extends PriorityAssignment {
 
 }
 
+class ArgumentFlowSetPriorityAssignment extends PriorityAssignment {
+
+  def flowSetSize(exp : Exp, env : BEnv, store : Store): Int = exp match {
+    case Ref(name) => store(env(name)).size
+    case _ => 1
+  }
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    val StoreSharp(store) = globalSharp
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(exp@App(f, args), env, t), _) =>
+          args.positionals.foldLeft(0)((sum, arg) => flowSetSize(arg.exp, env, store)) +
+            args.keywords.foldLeft(0)((sum, arg) => flowSetSize(arg.exp, env, store))
+        case _ => 0
+      }
+      OrderedState(state, priority)
+    })
+
+  }
+
+}
 
