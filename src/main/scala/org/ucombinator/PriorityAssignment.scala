@@ -2,6 +2,8 @@ package org.ucombinator
 
 import java.util.IdentityHashMap
 
+import scala.collection.immutable.TreeMap
+
 case class OrderedState(state: State, priority: Int) extends Ordered[OrderedState] {
   override def compare(that: OrderedState): Int = priority - that.priority
 }
@@ -212,6 +214,40 @@ class ExpressionFrequencyPriorityAssignment extends PriorityAssignment {
           m.put(exp, newCount)
       }
       OrderedState(state, Int.MaxValue - priority)
+    })
+  }
+
+}
+
+class TimeStampValuePriorityAssignment extends PriorityAssignment {
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    val StoreSharp(store) = globalSharp
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(_, _, KTime(last)), _) =>
+          last.sum
+      }
+      OrderedState(state, priority)
+    })
+  }
+
+}
+
+class TimeStampFrequencyPriorityAssignment extends PriorityAssignment {
+
+  var m: Map[Time, Int] = new TreeMap[Time, Int]()
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    val StoreSharp(store) = globalSharp
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(_, _, t), _) =>
+          var count = m.getOrElse(t, 0) + 1
+          m = m + (t -> count)
+          count
+      }
+      OrderedState(state, priority)
     })
   }
 
