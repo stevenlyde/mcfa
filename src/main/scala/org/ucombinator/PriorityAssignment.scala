@@ -156,5 +156,23 @@ class EnvironmentFlowSetPriorityAssignment extends PriorityAssignment {
 
 }
 
+class BranchingFactorPriorityAssignment extends PriorityAssignment {
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    val StoreSharp(store) = globalSharp
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(exp@App(f, args), env, t), _) =>
+          f match {
+            case Ref(name) => store(env(name)).size
+            case _ => 0
+          }
+        case _ => 0
+      }
+      OrderedState(state, priority)
+    })
+  }
+
+}
 
 
