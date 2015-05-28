@@ -350,3 +350,21 @@ class BreadthFirstLabelPriorityAssignment extends PriorityAssignment {
   }
 
 }
+
+class CallTypePriorityAssignment extends PriorityAssignment {
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(exp@App(f, args), _, _), _) =>
+          f match {
+            case Ref(SName(variable, _)) if variable.startsWith("cc$$") => 0
+            case _ => 1
+          }
+        case _ => 1
+      }
+      OrderedState(state, Int.MaxValue - priority)
+    })
+  }
+
+}
