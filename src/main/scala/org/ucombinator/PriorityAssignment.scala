@@ -123,3 +123,19 @@ class ExpressionSizer() {
   }
 
 }
+
+class EnvironmentSizePriorityAssignment extends PriorityAssignment {
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(_, MapBEnv(map), _), _) => map.size
+        case _ => 0 // we don't know the size of a flat environment
+      }
+      OrderedState(state, priority)
+    })
+  }
+
+}
+
+
