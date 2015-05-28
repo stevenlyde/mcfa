@@ -252,3 +252,48 @@ class TimeStampFrequencyPriorityAssignment extends PriorityAssignment {
   }
 
 }
+
+class DepthFirstLabelPriorityAssignment extends PriorityAssignment {
+
+  override def initialize(s: State): Unit = {
+    val State(CFlat(exp, _, _), _) = s
+    fold(exp)
+  }
+
+  private def fold(e: Exp): Unit = {
+    e.label
+    e match {
+      case App(f, args) =>
+        fold(f)
+        args.positionals.foreach(_.exp)
+        args.keywords.foreach(_.exp)
+
+      case Lambda(formals, ExpBody(body)) =>
+        fold(body)
+
+      case Seq(SetBang(name, value), call) =>
+        fold(value)
+        fold(call)
+
+      case If(condition, ifTrue, ifFalse) =>
+        fold(condition)
+        fold(ifTrue)
+        fold(ifFalse)
+
+      case Ref(name) =>
+      case Lit(value) =>
+      case Void() =>
+      case Undefined() =>
+    }
+  }
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(exp, _, _), _) => exp.label
+      }
+      OrderedState(state, priority)
+    })
+  }
+
+}
