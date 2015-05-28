@@ -358,7 +358,7 @@ class CallTypePriorityAssignment extends PriorityAssignment {
       val priority = state match {
         case State(CFlat(exp@App(f, args), _, _), _) =>
           f match {
-            case Ref(SName(variable, _)) if variable.startsWith("cc$$") => 0
+            case Ref(SName(variable, _)) if variable.startsWith("cc") => 0 // a uver variable might also start with cc
             case _ => 1
           }
         case _ => 1
