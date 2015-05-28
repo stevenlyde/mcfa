@@ -179,6 +179,7 @@ trait D {
   def join (that : D) : D ;
   def wt (that : D) : Boolean ;
   def toList : List[Value] ;
+  def size : Int
 }
 
 
@@ -210,6 +211,8 @@ case class SortedSetD (set : SortedSet[Value]) extends D {
   }
 
   def toList = set.toList
+
+  def size = set.size
 
   override def toString = "{" + (set mkString ",") + "}"
 }

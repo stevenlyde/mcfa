@@ -138,4 +138,23 @@ class EnvironmentSizePriorityAssignment extends PriorityAssignment {
 
 }
 
+class EnvironmentFlowSetPriorityAssignment extends PriorityAssignment {
+
+  def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
+    val StoreSharp(store) = globalSharp
+    states.map(state => {
+      val priority = state match {
+        case State(CFlat(_, MapBEnv(map), _), _) =>
+          map.foldLeft(0)((s, entry) => s + store(entry._2).size)
+
+          map.size
+        case _ => 0 // we don't know the addresses of a flat environment
+      }
+      OrderedState(state, priority)
+    })
+  }
+
+}
+
+
 
