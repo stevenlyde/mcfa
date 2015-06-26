@@ -11,6 +11,8 @@ abstract class DeltaSharp {
   def isEmpty : Boolean ;
 
   def apply(sharp : Sharp) : Sharp ;
+
+  def dependencies() : List[Addr]
 }
 
 case class StoreSharp(val store : Store) extends Sharp {
@@ -40,6 +42,10 @@ case class StoreUpdateDeltaSharp (val changeLog : List[StoreUpdate]) extends Del
 
   def apply (sharp : Sharp) : Sharp = 
     changeLog.foldLeft (sharp) ((sharp,update) => update(sharp))
+
+  def dependencies(): List[Addr] =
+    changeLog.map(_.addr)
+
 }
 
 /*

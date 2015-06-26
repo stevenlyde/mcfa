@@ -236,6 +236,26 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
       case _ => throw new Exception("unhandled state: " + state)
     }
-  }  
+  }
+
+  def addressOf (exp : Exp, bEnv : BEnv) : Option[Addr] = exp match {
+    case Ref(name) => Some(bEnv(name))
+    case _ => None
+  }
+
+  def dependencies (flat : Flat) : List[Addr] = flat match {
+    case CFlat(exp @ App(f,args),bEnv,t) =>
+      val exps = f :: args.keywords.map(_.exp) ++ args.positionals.map(_.exp)
+      for {
+        exp <- exps
+        addr <- addressOf(exp, bEnv)
+      } yield addr
+
+    case CFlat(exp @ Seq(SetBang(name,value),call),bEnv,t) =>
+      addressOf(value, bEnv).toList
+
+    case _ =>
+      List()
+  }
 
 }
