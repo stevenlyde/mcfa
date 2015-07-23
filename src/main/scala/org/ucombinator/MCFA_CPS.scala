@@ -7,9 +7,6 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
   var flatPolicy : String = "k"
 
-  val bEnv1 = bEnv0
-  val store1 = RnRSPrimitives.list.foldRight (store0) ((name,store) => store(bEnv1(SName.from(name))) = botD + PrimValue(name))
-
   def atomEval (bEnv : BEnv, store : Store) (exp : Exp) : D = exp match {
     case Lit(SBoolean(value)) => botD + BooleanValue(value)
     case _ : Lit => botD
@@ -25,21 +22,23 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
     case Void() => botD
     case lam : Lambda => {
-      botD + Clo(lam,bEnv)
+      botD + Clo(lam,bEnv | lam.free)
     }
   }
 
   def inject (exp : Exp) : State = {
-    State(CFlat(exp,bEnv0,t0),StoreSharp(store1))
+    val bEnv1 = bEnv0
+    val store1 = RnRSPrimitives.list.foldRight (store0) ((name,store) => store(bEnv1(SName.from(name))) = botD + PrimValue(name))
+    State(CFlat(exp,bEnv1,t0),StoreSharp(store1))
   }
 
   lazy val initialState = inject(exp)
 
-
   def tick (call : Exp, t : Time) : Time = t.succ(k,call.label)
 
-  def allocateBEnv (exp : Exp, current : BEnv, lam : Lambda, captured : BEnv, nextTime : Time) : BEnv = {
-    flatPolicy match {
+  def allocateBEnv (exp : Exp, current : BEnv, nextTime : Time)
+                   (lam : Lambda, captured : BEnv, store : Store) : (BEnv, Store) = {
+    val newBEnv = flatPolicy match {
       case "m" => 
         if (lam.isInstanceOf[ULambda])
           current.asInstanceOf[FlatBEnv].succ(m,exp.label)
@@ -48,8 +47,19 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
       case "k" =>
         FlatBEnv(nextTime.asInstanceOf[KTime].last)
     }
+
+    var newStore = store
+    if (newBEnv != captured)
+      for (x <- lam.free) {
+        newStore += (newBEnv(x),store(captured(x)))
+      }
+
+    (newBEnv, newStore)
   }
 
+  def extendBEnv (env : BEnv, name : SName, time : Time): BEnv = {
+    env
+  }
 
   def evalArgs (args : Arguments, bEnv : BEnv, store : Store) : Parameters = {
     args match {
@@ -70,9 +80,40 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
-
-  private def applyProcedure (allocBEnv : (Lambda,BEnv) => BEnv) (args : Arguments, params : Parameters, store : Store, newTime : Time) (proc : Value) : List[State] = {
+  private def applyProcedure (allocBEnv : (Lambda,BEnv,Store) => (BEnv,Store))
+                             (args : Arguments, params : Parameters, store : Store, newTime : Time)
+                             (proc : Value) : List[State] = {
     proc match {
+
+      case Clo(lam @ Lambda(VarFormals(name),ExpBody(call)),bEnv2) if !(call.free contains name)  => {
+        val (newBEnv, newStore) = allocBEnv(lam,bEnv2,store)
+        List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
+      }
+
+      case Clo(lam @ Lambda(formals,ExpBody(call)),bEnv2) if formals accepts args => {
+
+        var (newBEnv, newStore) = allocBEnv(lam,bEnv2,store)
+
+        // Bind positional arguments:
+        for ((PosFormal(name),d) <- formals.positionals zip params.positionals) {
+          newBEnv = extendBEnv(newBEnv, name, newTime)
+          newStore += (newBEnv(name), d)
+        }
+
+        // Bind keyword arguments:
+        for (KeywordFormal(keyword,name) <- formals.keywords) {
+          newBEnv = extendBEnv(newBEnv, name, newTime)
+          newStore += (newBEnv(name), params(keyword))
+        }
+
+        if (formals.positionals.length < params.positionals.length) {
+          // Stuff the rest into a list.
+          val remainder = params.positionals.drop(formals.positionals.length)
+          throw new Exception(exp + "\nv.\n" + lam)
+        }
+
+        List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
+      }
 
       case PrimValue("*"|"+"|"-"|"/"|"quotient"|"gcd"|"modulo") => {
         val conts = params(SKeyword.from("cc"))
@@ -142,10 +183,8 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
         }
       }
 
-      // Anything that returns a Boolean:
-      case PrimValue("not"|"equal?"|"eqv?"|"eq?"|"odd?"|"even?"|"char?"|"char=?"|"char-alphabetic?"|"char-numeric?"|"string<?"|"boolean?"|
-                     "procedure?"|"string?"|
-                     "symbol?"|"pair?"|"list?"|"null?"|"integer?"|"number?"|"<"|"="|">"|"<="|">=") => {
+      case PrimValue("not"|"equal?"|"eqv?"|"eq?"|"odd?"|"even?"|"char?"|"char=?"|"char-alphabetic?"|"char-numeric?"|"string<?"|"boolean?"|"procedure?"|
+                     "string?"|"symbol?"|"pair?"|"list?"|"null?"|"number?"|"integer?"|"<"|"="|">"|"<="|">=") => {
         val conts = params(SKeyword.from("cc"))
         val primParams = (botD + BooleanValue(true) + BooleanValue(false)) :: (new Parameters())
         for (cont <- conts.toList; succ <- applyProcedure (allocBEnv) (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
@@ -162,11 +201,11 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
               val loc = cellLoc.asInstanceOf[ObjectLocation]
               val fieldValue = store.getOrElse(FieldAddr(loc,SName.from("cons")),botD)
               val primParams = fieldValue :: (new Parameters())
-              val states : List[State] = 
-                for (cont <- conts.toList; 
+              val states : List[State] =
+                for (cont <- conts.toList;
                      succ <- applyProcedure (allocBEnv) (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
                        succ
-                     } 
+                     }
               states
             }
           val states : List[State] = statess.flatMap(states => states)
@@ -177,68 +216,21 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
       }
 
       case PrimValue("error") => List()
-      
-      case Clo(lam @ Lambda(VarFormals(name),ExpBody(call)),bEnv2) if !(call.free contains name)  => {
-        val newBEnv = allocBEnv(lam,bEnv2) // allocateBEnv(exp,bEnv,lam,bEnv2,newTime)
-        var newStore = store 
-        if (newBEnv != bEnv2)
-          for (x <- lam.free) {
-            newStore += (newBEnv(x),store(bEnv2(x)))
-          }
-        List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
-      }
-      
-      
-      case Clo(lam @ Lambda(formals,ExpBody(call)),bEnv2) if formals accepts args => {
-        
-        val newBEnv = allocBEnv(lam,bEnv2) // allocateBEnv(exp,bEnv,lam,bEnv2,newTime)
-        
-        var newStore = store 
-        
-        // Bind positional arguments:
-        for ((PosFormal(name),d) <- formals.positionals zip params.positionals)  {
-          newStore += (newBEnv(name), d)
-        }
-        
-        // Bind keyword arguments:
-        for (KeywordFormal(keyword,name) <- formals.keywords) {
-          newStore += (newBEnv(name), params(keyword))
-        }
-        
-        // Copy free variables from the old environment to the new:
-        // println("[[" +lam+ "]].free = " + lam.free) // DEBUG 
-        if (newBEnv != bEnv2) 
-          for (x <- lam.free) {
-            //println("Copying free variable: " + newBEnv(x) + " from " + bEnv2(x)) // DEBUG
-            newStore += (newBEnv(x),store(bEnv2(x)))
-          }
-        
-        if (formals.positionals.length < params.positionals.length) {
-          // Stuff the rest into a list.
-          val remainder = params.positionals.drop(formals.positionals.length)
-          throw new Exception()
-        }
-        
-        List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
-      }
-      
-      
-      // case _ => throw new Exception("transition not complete")
-    }    
+
+    }
   }
 
 
 
-  
   def next (state : State) : List[State] = {
     state match {
       
       case State(CFlat(exp @ App(f,args),bEnv,t),StoreSharp(store)) => {
         val procs = atomEval (bEnv,store) (f)
-        val params = evalArgs(args,bEnv,store)
+        val params = evalArgs (args,bEnv,store)
         val newTime = tick(exp,t)
-        def allocBEnv (lam : Lambda, bEnv2 : BEnv) = allocateBEnv(exp,bEnv,lam,bEnv2,newTime)
-        for (procValue <- procs.toList if procValue.isProcedure; 
+        val allocBEnv = allocateBEnv(exp,bEnv,newTime) _
+        for (procValue <- procs.toList if procValue.isProcedure;
              succ <- applyProcedure (allocBEnv) (args,params,store,newTime) (procValue)) yield {
           succ
         }
