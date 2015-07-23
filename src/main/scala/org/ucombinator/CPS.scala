@@ -1,8 +1,16 @@
 package org.ucombinator
 
-class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) extends SmallStepAbstractInterpretation {
+trait CFA extends SmallStepAbstractInterpretation {
 
-  var k : Int = 0
+  val botD : D
+
+  var k : Int
+
+  def allocateBEnv (exp : Exp, current : BEnv, nextTime : Time)
+                   (lam : Lambda, captured : BEnv, store : Store) : (BEnv, Store)
+
+  def extendBEnv (env : BEnv, name : SName, time : Time): BEnv
+
 
   def atomEval (bEnv : BEnv, store : Store) (exp : Exp) : D = exp match {
     case Lit(SBoolean(value)) => botD + BooleanValue(value)
@@ -23,24 +31,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
-  def inject (exp : Exp) : State = {
-    val bEnv1 = RnRSPrimitives.list.foldRight (bEnv0) ((name,bEnv) => bEnv(SName.from(name)) = PrimAddr(SName.from(name)))
-    val store1 = RnRSPrimitives.list.foldRight (store0) ((name,store) => store(bEnv1(SName.from(name))) = botD + PrimValue(name))
-    State(CFlat(exp,bEnv1,t0),StoreSharp(store1))
-  }
-
-  lazy val initialState = inject(exp)
-
   def tick (call : Exp, t : Time) : Time = t.succ(k,call.label)
-
-  def allocateBEnv (exp : Exp, current : BEnv, nextTime : Time)
-                   (lam : Lambda, captured : BEnv, store : Store) : (BEnv, Store) = {
-    (captured, store)
-  }
-
-  def extendBEnv (env : BEnv, name : SName, time : Time): BEnv = {
-    env(name) = MapBind(name,time)
-  }
 
   def evalArgs (args : Arguments, bEnv : BEnv, store : Store) : Parameters = {
     args match {
@@ -90,7 +81,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
         if (formals.positionals.length < params.positionals.length) {
           // Stuff the rest into a list.
           val remainder = params.positionals.drop(formals.positionals.length)
-          throw new Exception(exp + "\nv.\n" + lam)
+          throw new Exception()
         }
 
         List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))

@@ -49,7 +49,7 @@ object RunCFA {
 
     opts.analysis match {
      case "full" => { 
-       val CFA = new KCFA_CPS(cpast,new MapBEnv(TreeMap()), KTime(List()), new MapStore(), new SortedSetD())
+       val CFA = new KCFA(cpast,new MapBEnv(TreeMap()), KTime(List()), new MapStore(), new SortedSetD())
        CFA.printStates = opts.printStates
        CFA.k = opts.k
        CFA.runWithGlobalSharp()
@@ -60,7 +60,7 @@ object RunCFA {
        println ("inlinable: " + inlinable)
      }
      case "flat" => { 
-       val CFA = new MCFA_CPS(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
+       val CFA = new MCFA(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
        CFA.printStates = opts.printStates
        CFA.k = opts.k
        CFA.m = opts.m
@@ -74,7 +74,7 @@ object RunCFA {
      }
       
      case "compare-m-poly-1" => {
-       val P1CFA = new MCFA_CPS(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
+       val P1CFA = new MCFA(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
        P1CFA.k = 1
        P1CFA.m = 1
        P1CFA.flatPolicy = "k"
@@ -83,7 +83,7 @@ object RunCFA {
        val pStore = pSharp.asInstanceOf[StoreSharp].store
        val pFlows = Store.condense (pStore)
        
-       val M1CFA = new MCFA_CPS(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
+       val M1CFA = new MCFA(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
        M1CFA.k = 1
        M1CFA.m = 1
        M1CFA.flatPolicy = "m"
