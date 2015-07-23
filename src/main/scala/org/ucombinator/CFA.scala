@@ -149,9 +149,10 @@ trait CFA extends SmallStepAbstractInterpretation {
           var newStore = store
           newStore = (newStore(carAddr) = carD)
           newStore = (newStore(cdrAddr) = cdrD)
-          for (cont <- conts.toList; succ <- applyProcedure (allocBEnv) (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
-            succ
-          }
+          for {
+            cont <- conts.toList
+            succ <- applyProcedure (allocBEnv) (InternalPrimArguments,primParams,store,newTime) (cont)
+          } yield succ
         }
       }
 
@@ -165,26 +166,14 @@ trait CFA extends SmallStepAbstractInterpretation {
       }
 
       case PrimValue(field @ ("car"|"cdr")) => {
-        val conts = params(SKeyword.from("cc"))
-        if (params.positionals.length == 1) {
-          val cellLocs = params(0)
-          val statess : List[List[State]] =
-            for (cellLoc <- cellLocs.toList if cellLoc.isObjectLocation) yield {
-              val loc = cellLoc.asInstanceOf[ObjectLocation]
-              val fieldValue = store.getOrElse(FieldAddr(loc,SName.from("cons")),botD)
-              val primParams = fieldValue :: (new Parameters())
-              val states : List[State] =
-                for (cont <- conts.toList;
-                     succ <- applyProcedure (allocBEnv) (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
-                       succ
-                     }
-              states
-            }
-          val states : List[State] = statess.flatMap(states => states)
-          states
-        } else {
-          List()
-        }
+        for {
+          cellLoc <- params(0).toList if cellLoc.isObjectLocation && params.positionals.length == 1
+          loc = cellLoc.asInstanceOf[ObjectLocation]
+          fieldValue = store.getOrElse(FieldAddr(loc,SName.from(field)),botD)
+          primParams = fieldValue :: (new Parameters())
+          cont <- params(SKeyword.from("cc")).toList
+          succ <- applyProcedure (allocBEnv) (InternalPrimArguments,primParams,store,newTime) (cont)
+        } yield succ
       }
 
       case PrimValue("error") => List()
