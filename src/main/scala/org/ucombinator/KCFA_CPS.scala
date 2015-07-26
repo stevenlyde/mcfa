@@ -153,7 +153,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           var newStore = store
           newStore = (newStore(carAddr) = carD)
           newStore = (newStore(cdrAddr) = cdrD)
-          for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,store,newTime) (cont)) yield {
+          for (cont <- conts.toList; succ <- applyProcedure (InternalPrimArguments,primParams,newStore,newTime) (cont)) yield {
             succ
           }
         }
@@ -176,7 +176,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           val statess : List[List[State]] =
             for (cellLoc <- cellLocs.toList if cellLoc.isObjectLocation) yield {
               val loc = cellLoc.asInstanceOf[ObjectLocation]
-              val fieldValue = store.getOrElse(FieldAddr(loc,SName.from("cons")),botD)
+              val fieldValue = store.getOrElse(FieldAddr(loc,SName.from(field)),botD)
               val primParams = fieldValue :: (new Parameters())
               val states : List[State] = 
                 for (cont <- conts.toList; 
