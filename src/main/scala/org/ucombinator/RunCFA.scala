@@ -47,6 +47,8 @@ object RunCFA {
     System.out.println(cpast.free)
     System.out.println("\n")
 
+    ExpressionFold(cpast, 0, (_: Int, e) => e.label)
+
     opts.analysis match {
      case "full" => { 
        val CFA = new KCFA_CPS(cpast,new MapBEnv(TreeMap()), KTime(List()), new MapStore(), new SortedSetD())
@@ -56,6 +58,10 @@ object RunCFA {
        CFA.runWithGlobalSharp(assignment)
        val sharp = CFA.globalSharp
        val store = sharp.asInstanceOf[StoreSharp].store
+       if (opts.writeStore) {
+         val writer = new StoreSymbolicExpressionWriter(store)
+         writer.write(opts)
+       }
        val flows = Store.condense (store)
        val inlinable = Store.countInlinable(flows)
        println ("inlinable: " + inlinable)
@@ -70,6 +76,10 @@ object RunCFA {
        CFA.runWithGlobalSharp(assignment)
        val sharp = CFA.globalSharp
        val store = sharp.asInstanceOf[StoreSharp].store
+       if (opts.writeStore) {
+         val writer = new StoreSymbolicExpressionWriter(store)
+         writer.write(opts)
+       }
        val flows = Store.condense (store)
        val inlinable = Store.countInlinable(flows)
        println ("inlinable: " + inlinable)
