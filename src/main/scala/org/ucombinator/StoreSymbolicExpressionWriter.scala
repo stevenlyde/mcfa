@@ -20,7 +20,7 @@ class StoreSymbolicExpressionWriter(store: Store) {
   }
 
   def write(opts: CFAOptions): Unit = {
-    val fileName = s"${opts.analysis}-${opts.k}-${trimFileName(opts.file)}.txt"
+    val fileName = s"${opts.analysis}-${opts.k}-${opts.ordering}-${trimFileName(opts.file)}.txt"
     write(fileName)
   }
 
