@@ -7,6 +7,7 @@ class CFAOptions {
   var printStates = false ;
   var flatPolicy = "m"
   var analysis = "flat"
+  var ordering = "bfs"
 }
 
 object CFAOptions {
@@ -30,6 +31,11 @@ object CFAOptions {
 
     case "--analysis" :: a :: rest => { 
       opts.analysis = a
+      parse(rest,opts)
+    }
+
+    case "--ordering" :: o :: rest => {
+      opts.ordering = o
       parse(rest,opts)
     }
 

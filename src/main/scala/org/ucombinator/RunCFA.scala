@@ -52,7 +52,8 @@ object RunCFA {
        val CFA = new KCFA_CPS(cpast,new MapBEnv(TreeMap()), KTime(List()), new MapStore(), new SortedSetD())
        CFA.printStates = opts.printStates
        CFA.k = opts.k
-       CFA.runWithGlobalSharp()
+       val assignment = PriorityAssignment(opts.ordering)
+       CFA.runWithGlobalSharp(assignment)
        val sharp = CFA.globalSharp
        val store = sharp.asInstanceOf[StoreSharp].store
        val flows = Store.condense (store)
@@ -65,7 +66,8 @@ object RunCFA {
        CFA.k = opts.k
        CFA.m = opts.m
        CFA.flatPolicy = opts.flatPolicy
-       CFA.runWithGlobalSharp()
+       val assignment = PriorityAssignment(opts.ordering)
+       CFA.runWithGlobalSharp(assignment)
        val sharp = CFA.globalSharp
        val store = sharp.asInstanceOf[StoreSharp].store
        val flows = Store.condense (store)
@@ -78,7 +80,7 @@ object RunCFA {
        P1CFA.k = 1
        P1CFA.m = 1
        P1CFA.flatPolicy = "k"
-       P1CFA.runWithGlobalSharp()
+       P1CFA.runWithGlobalSharp(PriorityAssignment(opts.ordering))
        val pSharp = P1CFA.globalSharp
        val pStore = pSharp.asInstanceOf[StoreSharp].store
        val pFlows = Store.condense (pStore)
@@ -87,7 +89,7 @@ object RunCFA {
        M1CFA.k = 1
        M1CFA.m = 1
        M1CFA.flatPolicy = "m"
-       M1CFA.runWithGlobalSharp()
+       M1CFA.runWithGlobalSharp(PriorityAssignment(opts.ordering))
        val mSharp = M1CFA.globalSharp
        val mStore = mSharp.asInstanceOf[StoreSharp].store
        val mFlows = Store.condense (mStore)

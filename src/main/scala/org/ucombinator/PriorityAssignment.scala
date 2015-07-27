@@ -5,6 +5,28 @@ import java.util.IdentityHashMap
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable.Queue
 
+object PriorityAssignment {
+
+  def apply(odering: String): PriorityAssignment = odering match {
+    case "bfs" => new BreadthFirstSearchPriorityAssignment
+    case "dfs" => new DepthFirstSearchPriorityAssignment
+    case "ctp" => new ExpressionTypePriorityAssignment
+    case "csz" => new ExpressionSizePriorityAssignment
+    case "cdl" => new DepthFirstLabelPriorityAssignment
+    case "cbl" => new BreadthFirstLabelPriorityAssignment
+    case "cfq" => new ExpressionFrequencyPriorityAssignment
+    case "ccr" => new CallTypePriorityAssignment
+    case "esz" => new EnvironmentSizePriorityAssignment
+    case "efs" => new EnvironmentFlowSetPriorityAssignment
+    case "sas" => new ArgumentFlowSetPriorityAssignment
+    case "sbf"  => new BranchingFactorPriorityAssignment
+    case "tfq"  => new TimestampFrequencyPriorityAssignment
+    case "tvl"  => new TimestampValuePriorityAssignment
+    case "ocp"  => new ConstantPriorityAssignment
+  }
+
+}
+
 case class OrderedState(state: State, priority: Int) extends Ordered[OrderedState] {
   override def compare(that: OrderedState): Int = priority - that.priority
 }
@@ -220,7 +242,7 @@ class ExpressionFrequencyPriorityAssignment extends PriorityAssignment {
 
 }
 
-class TimeStampValuePriorityAssignment extends PriorityAssignment {
+class TimestampValuePriorityAssignment extends PriorityAssignment {
 
   def prioritize(states: List[State], globalSharp: Sharp): List[OrderedState] = {
     val StoreSharp(store) = globalSharp
@@ -235,7 +257,7 @@ class TimeStampValuePriorityAssignment extends PriorityAssignment {
 
 }
 
-class TimeStampFrequencyPriorityAssignment extends PriorityAssignment {
+class TimestampFrequencyPriorityAssignment extends PriorityAssignment {
 
   var m: Map[Time, Int] = new TreeMap[Time, Int]()
 

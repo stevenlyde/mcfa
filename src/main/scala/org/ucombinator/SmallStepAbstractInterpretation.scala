@@ -11,14 +11,13 @@ trait SmallStepAbstractInterpretation {
   var count = 0
   var globalSharp: Sharp = null
 
-  def runWithGlobalSharp() {
+  def runWithGlobalSharp(assignment: PriorityAssignment) {
     // seen records the last generation store seen with this flat.
     val seen = scala.collection.mutable.HashMap[Flat, Long]()
     var currentGeneration: Long = 1
 
     val init = initialState
     val todo = new PriorityQueue[OrderedState]()
-    val assignment: PriorityAssignment = new CallTypePriorityAssignment
     assignment.initialize(init)
     todo ++= assignment.prioritize(List(init), init.sharp)
 
