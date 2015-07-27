@@ -7,7 +7,7 @@ import scala.collection.mutable.Queue
 
 object PriorityAssignment {
 
-  def apply(odering: String): PriorityAssignment = odering match {
+  def apply(ordering: String): PriorityAssignment = ordering match {
     case "bfs" => new BreadthFirstSearchPriorityAssignment
     case "dfs" => new DepthFirstSearchPriorityAssignment
     case "ctp" => new ExpressionTypePriorityAssignment

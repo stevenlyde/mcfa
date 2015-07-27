@@ -55,7 +55,9 @@ object RunCFA {
        CFA.printStates = opts.printStates
        CFA.k = opts.k
        val assignment = PriorityAssignment(opts.ordering)
+       val start = System.currentTimeMillis
        CFA.runWithGlobalSharp(assignment)
+       val time = System.currentTimeMillis - start
        val sharp = CFA.globalSharp
        val store = sharp.asInstanceOf[StoreSharp].store
        if (opts.writeStore) {
@@ -65,6 +67,7 @@ object RunCFA {
        val flows = Store.condense (store)
        val inlinable = Store.countInlinable(flows)
        println ("inlinable: " + inlinable)
+       println ("analysis time: " + time)
      }
      case "flat" => { 
        val CFA = new MCFA_CPS(cpast,new FlatBEnv(List()), KTime(List()), new MapStore(), new SortedSetD())
@@ -73,7 +76,9 @@ object RunCFA {
        CFA.m = opts.m
        CFA.flatPolicy = opts.flatPolicy
        val assignment = PriorityAssignment(opts.ordering)
+       val start = System.currentTimeMillis
        CFA.runWithGlobalSharp(assignment)
+       val time = System.currentTimeMillis - start
        val sharp = CFA.globalSharp
        val store = sharp.asInstanceOf[StoreSharp].store
        if (opts.writeStore) {
@@ -83,6 +88,7 @@ object RunCFA {
        val flows = Store.condense (store)
        val inlinable = Store.countInlinable(flows)
        println ("inlinable: " + inlinable)
+       println ("analysis time: " + time)
      }
       
      case "compare-m-poly-1" => {
