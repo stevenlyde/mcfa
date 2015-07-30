@@ -54,6 +54,26 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
+  private def hanldeRestArgs (formals : Formals, rest : List[D], bEnv : BEnv, store : Store, newTime : Time): (BEnv, Store) = formals match {
+    case MultiFormals(fs, r) =>
+      var newBEnv = bEnv
+      var newStore = store
+
+      newBEnv = (newBEnv(r) = MapBind(r,newTime))
+
+      val loc = ConsLocation(newTime)
+      val carD = rest.foldLeft(botD)((a, d) => a join d)
+      val cdrD = botD + loc
+      val carAddr = FieldAddr(loc,SName.from("car"))
+      val cdrAddr = FieldAddr(loc,SName.from("cdr"))
+      newStore += (carAddr, carD)
+      newStore += (cdrAddr, cdrD)
+      newStore += (newBEnv(r), botD + loc)
+
+      (newBEnv, newStore)
+
+    case _ => (bEnv, store)
+  }
 
   private def applyProcedure (args : Arguments, params : Parameters, store : Store, newTime : Time) (proc : Value) : List[State] = {
     proc match {
@@ -61,6 +81,8 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
       case Clo(lam @ Lambda(VarFormals(name),ExpBody(call)),bEnv2) if !(call.free contains name)  => {
         List(State(CFlat(call,bEnv2,newTime),StoreSharp(store)))
       }
+
+      case Clo(Lambda(formals,_),_) if !(formals accepts args) => List()
       
       case Clo(lam @ Lambda(formals,ExpBody(call)),bEnv2) if formals accepts args => {
         
@@ -79,13 +101,12 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           newBEnv = (newBEnv(name) = MapBind(name,newTime))
           newStore += (newBEnv(name), params(keyword))
         }
-        
-        if (formals.positionals.length < params.positionals.length) {
-          // Stuff the rest into a list.
-          val remainder = params.positionals.drop(formals.positionals.length)
-          throw new Exception(exp + "\nv.\n" + lam)
-        }
-        
+
+        val rest = params.positionals.drop(formals.positionals.length)
+        val (tmpBEnv, tmpStore) = hanldeRestArgs(formals, rest, newBEnv, newStore, newTime)
+        newBEnv = tmpBEnv
+        newStore = tmpStore
+
         List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
       }
 
@@ -230,7 +251,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
 
       // Non-call expression: Halt!
       case State(CFlat(ae @ (_ : Ref | _ : Lit | _ : Undefined),bEnv,t),StoreSharp(store)) => {
-        System.out.println("Halting state; final value: " + atomEval (bEnv,store) (ae)) // DEBUG
+        //System.out.println("Halting state; final value: " + atomEval (bEnv,store) (ae)) // DEBUG
         List()
       }
 

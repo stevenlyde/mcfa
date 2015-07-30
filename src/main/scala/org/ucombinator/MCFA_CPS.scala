@@ -70,6 +70,26 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
+  private def hanldeRestArgs (formals : Formals, rest : List[D], bEnv : BEnv, store : Store, newTime : Time): (BEnv, Store) = formals match {
+    case MultiFormals(fs, r) =>
+      var newBEnv = bEnv
+      var newStore = store
+
+      newBEnv = (newBEnv(r) = MapBind(r,newTime))
+
+      val loc = ConsLocation(newTime)
+      val carD = rest.foldLeft(botD)((a, d) => a join d)
+      val cdrD = botD + loc
+      val carAddr = FieldAddr(loc,SName.from("car"))
+      val cdrAddr = FieldAddr(loc,SName.from("cdr"))
+      newStore += (carAddr, carD)
+      newStore += (cdrAddr, cdrD)
+      newStore += (newBEnv(r), botD + loc)
+
+      (newBEnv, newStore)
+
+    case _ => (bEnv, store)
+  }
 
   private def applyProcedure (allocBEnv : (Lambda,BEnv) => BEnv) (args : Arguments, params : Parameters, store : Store, newTime : Time) (proc : Value) : List[State] = {
     proc match {
@@ -187,11 +207,12 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           }
         List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
       }
-      
-      
+
+      case Clo(Lambda(formals,_),_) if !(formals accepts args) => List()
+
       case Clo(lam @ Lambda(formals,ExpBody(call)),bEnv2) if formals accepts args => {
         
-        val newBEnv = allocBEnv(lam,bEnv2) // allocateBEnv(exp,bEnv,lam,bEnv2,newTime)
+        var newBEnv = allocBEnv(lam,bEnv2) // allocateBEnv(exp,bEnv,lam,bEnv2,newTime)
         
         var newStore = store 
         
@@ -212,12 +233,11 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
             //println("Copying free variable: " + newBEnv(x) + " from " + bEnv2(x)) // DEBUG
             newStore += (newBEnv(x),store(bEnv2(x)))
           }
-        
-        if (formals.positionals.length < params.positionals.length) {
-          // Stuff the rest into a list.
-          val remainder = params.positionals.drop(formals.positionals.length)
-          throw new Exception()
-        }
+
+        val rest = params.positionals.drop(formals.positionals.length)
+        val (tmpBEnv, tmpStore) = hanldeRestArgs(formals, rest, newBEnv, newStore, newTime)
+        newBEnv = tmpBEnv
+        newStore = tmpStore
         
         List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
       }

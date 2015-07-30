@@ -17,22 +17,23 @@ object RunCFA {
     System.err.print("Parsing s-expressions...")
     val sexps = SExp.parseAllIn(filename)
     System.err.println("done")
-    
+
     System.err.print("Bulding AST...")
     val ast = RnRSParser(sexps)
-    System.err.println("done") 
-    
+    System.err.println("done")
+
     System.err.print("A-normalizing...")
-    val anast = ANormalizer(ast)
-    System.err.println("done") 
-    
+    val aast = Alphatiser(ast)
+    val anast = ANormalizer(aast)
+    System.err.println("done")
+
     System.err.print("CPS-converting...")
     val cpast = CPSConverter(anast)
     System.err.println("done") 
 
 
     System.out.println("Input program:")
-    System.out.println(ast)
+    System.out.println(aast)
     System.out.println("\n")
 
     System.out.println("ANF program:")
