@@ -70,12 +70,12 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
-  private def hanldeRestArgs (formals : Formals, rest : List[D], bEnv : BEnv, store : Store, newTime : Time): (BEnv, Store) = formals match {
+  private def handleRestArgs (formals : Formals, params : Parameters, bEnv : BEnv, store : Store, newTime : Time): Store = formals match {
     case MultiFormals(fs, r) =>
+      val rest = params.positionals.drop(formals.positionals.length)
+
       var newBEnv = bEnv
       var newStore = store
-
-      newBEnv = (newBEnv(r) = MapBind(r,newTime))
 
       val loc = ConsLocation(newTime)
       val carD = rest.foldLeft(botD)((a, d) => a join d)
@@ -86,9 +86,9 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
       newStore += (cdrAddr, cdrD)
       newStore += (newBEnv(r), botD + loc)
 
-      (newBEnv, newStore)
+      newStore
 
-    case _ => (bEnv, store)
+    case _ => store
   }
 
   private def applyProcedure (allocBEnv : (Lambda,BEnv) => BEnv) (args : Arguments, params : Parameters, store : Store, newTime : Time) (proc : Value) : List[State] = {
@@ -234,11 +234,8 @@ class MCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
             newStore += (newBEnv(x),store(bEnv2(x)))
           }
 
-        val rest = params.positionals.drop(formals.positionals.length)
-        val (tmpBEnv, tmpStore) = hanldeRestArgs(formals, rest, newBEnv, newStore, newTime)
-        newBEnv = tmpBEnv
-        newStore = tmpStore
-        
+        newStore = handleRestArgs(formals, params, newBEnv, newStore, newTime)
+
         List(State(CFlat(call,newBEnv,newTime),StoreSharp(newStore)))
       }
       

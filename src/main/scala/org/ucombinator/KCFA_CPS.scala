@@ -54,8 +54,10 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
     }
   }
 
-  private def hanldeRestArgs (formals : Formals, rest : List[D], bEnv : BEnv, store : Store, newTime : Time): (BEnv, Store) = formals match {
+  private def handleRestArgs (formals : Formals, params : Parameters, bEnv : BEnv, store : Store, newTime : Time): (BEnv, Store) = formals match {
     case MultiFormals(fs, r) =>
+      val rest = params.positionals.drop(formals.positionals.length)
+
       var newBEnv = bEnv
       var newStore = store
 
@@ -102,8 +104,7 @@ class KCFA_CPS(exp : Exp, bEnv0 : BEnv, t0 : Time, store0 : Store, botD : D) ext
           newStore += (newBEnv(name), params(keyword))
         }
 
-        val rest = params.positionals.drop(formals.positionals.length)
-        val (tmpBEnv, tmpStore) = hanldeRestArgs(formals, rest, newBEnv, newStore, newTime)
+        val (tmpBEnv, tmpStore) = handleRestArgs(formals, params, newBEnv, newStore, newTime)
         newBEnv = tmpBEnv
         newStore = tmpStore
 
